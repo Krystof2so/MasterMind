@@ -5,9 +5,6 @@ from random import choice
 
 from colorama import Fore, Style
 
-# Todo:
-#  - Autre algorithme pour la méthode '_evaluate_game_turn(self, player_combo: list)'
-
 
 class DatasText(StrEnum):
     """Ensemble des données textuelles affichées dans le terminal."""
@@ -34,10 +31,8 @@ class MasterMind:
         'Magenta': Fore.MAGENTA
     }
     # Objets nécessaires et constantes
-    COLOUR_SQUARE: str = "\u25A0"
-    COLOUR_INDICATOR: str = "\u25CF"
-    LIM_SECRET_COMBO: int = 4
-    LIM_TOUR: int = 10
+    COLOUR_SQUARE, COLOUR_INDICATOR = "\u25A0", "\u25CF"
+    LIM_SECRET_COMBO, LIM_TOUR = 4, 10
 
     def __init__(self):
         self._all_colors_names, self._all_colors = list(MasterMind.COLORS.keys()), list(MasterMind.COLORS.values())
@@ -62,8 +57,8 @@ class MasterMind:
         while True:
             user_combo = input(DatasText.ASK_SECRET_COMBO)
             # Condition pour vérifier la saisie de l'utilisateur qui doit contenir 4 chiffres :
-            if (len(user_combo) != MasterMind.LIM_SECRET_COMBO or not user_combo.isdigit() or
-                    any(int(n) not in range(1, len(MasterMind.COLORS) + 1) for n in user_combo)):
+            if not (len(user_combo) == MasterMind.LIM_SECRET_COMBO and user_combo.isdigit() and
+                    all(int(n) in range(1, len(MasterMind.COLORS) + 1) for n in user_combo)):
                 print(DatasText.ERROR_INPUT)
                 continue
             return [self._all_colors_names[int(n) - 1] for n in user_combo]
@@ -71,26 +66,29 @@ class MasterMind:
     def _evaluate_game_turn(self, player_combo: list[str]) -> tuple[int, int]:
         """
         Compare la proposition du joueur avec la combinaison à trouver, et fournit en retour les indicateurs.
-        :param player_combo list: Liste des couleurs proposées par le joueur.
+        :param player_combo: Liste des couleurs proposées par le joueur.
         :return tuple: Le nombre d'indicateurs rouges et blancs.
         """
         red_indicators = white_indicators = 0
-        copy_player_combo = player_combo.copy()
-        copy_secret_combo = self._secret_combo.copy()
+        #  Counter pour compter les occurrences de chaque couleur dans les combinaisons
+        secret_counts = Counter(self._secret_combo)
+        player_counts = Counter(player_combo)
 
-        # Évaluation des indices rouges (bonne position dans la combinaison)
+        # Deux itérations sur la combinaison du joueur :
+        # 1 - Évaluation des indices rouges (bonne position dans la combinaison)
         for player_color, secret_color in zip(player_combo, self._secret_combo):
             if player_color == secret_color:
                 red_indicators += 1
-                copy_player_combo.remove(player_color)
-                copy_secret_combo.remove(secret_color)
+                # Décrémentez le compteur d'occurrences pour cette couleur dans la combinaison secrète
+                secret_counts[player_color] -= 1
 
-        # Évaluation des indices blancs (mauvaise position dans la combinaison) avec méthode 'Counter'
-        player_counts = Counter(copy_player_combo)
-        secret_counts = Counter(copy_secret_combo)
+        # 2 - Évaluation des indices blancs (mauvaise position dans la combinaison)
         for color, count in player_counts.items():
             if color in secret_counts:
+                # min() = minimum d'occurrences = nombre d'indicateurs blancs
                 white_indicators += min(count, secret_counts[color])
+                # Nouvelle décrémentation (évite les comptages doubles)
+                secret_counts[color] -= min(count, secret_counts[color])
 
         return red_indicators, white_indicators
 
@@ -120,10 +118,9 @@ class MasterMind:
             # Affichage combinaison joueur + indicateurs :
             print(f"{self._four_colors(player_combination)} Indicateurs : {all_red_indicators}{all_white_indicators}")
             # Conditions de sortie de la boucle de jeu :
-            if player_combination == self._secret_combo:
-                return DatasText.WIN + self._secret_colors
-            if tour == MasterMind.LIM_TOUR:
-                return DatasText.LOOSE + self._secret_colors
+            if player_combination == self._secret_combo or tour == MasterMind.LIM_TOUR:
+                end_game_msg = DatasText.WIN if player_combination == self._secret_combo else DatasText.LOOSE
+                return end_game_msg + self._secret_colors
 
 
 if __name__ == "__main__":
